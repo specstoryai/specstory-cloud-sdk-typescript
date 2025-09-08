@@ -2,7 +2,6 @@ import { SDKError } from './errors';
 import {
   SDK_VERSION,
   SDK_LANGUAGE,
-  DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_RETRIES,
   DEFAULT_BASE_DELAY_MS,
   IDEMPOTENT_METHODS,
@@ -23,6 +22,11 @@ export interface RequestOptions {
   timeoutMs?: number;
   idempotencyKey?: string;
   retries?: number;
+}
+
+export interface WithHeaders<T> {
+  data: T;
+  headers: Record<string, string>;
 }
 
 export class HTTPClient {
@@ -131,5 +135,106 @@ export class HTTPClient {
     const jitter = Math.random() * 100;
     const delay = DEFAULT_BASE_DELAY_MS * Math.pow(2, attempt) + jitter;
     await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  async requestWithHeaders<T>(options: RequestOptions): Promise<WithHeaders<T>> {
+    const url = `${this.config.baseUrl}${options.path}`;
+    const timeoutMs = options.timeoutMs ?? this.config.timeoutMs;
+    const maxRetries = options.retries ?? DEFAULT_MAX_RETRIES;
+    
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.config.apiKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': `specstory-sdk-${SDK_LANGUAGE}/${SDK_VERSION}`,
+      'X-SDK-Version': SDK_VERSION,
+      'X-SDK-Language': SDK_LANGUAGE,
+      ...options.headers,
+    };
+
+    if (options.idempotencyKey) {
+      headers['Idempotency-Key'] = options.idempotencyKey;
+    }
+
+    let lastError: Error | undefined;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+        const response = await fetch(url, {
+          method: options.method,
+          headers,
+          body: options.body ? JSON.stringify(options.body) : undefined,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          const error = SDKError.fromResponse(response);
+          
+          // Only retry on specific status codes and methods
+          if (
+            attempt < maxRetries &&
+            (RETRY_STATUS_CODES.has(response.status) ||
+              (options.method === 'POST' && options.idempotencyKey && response.status >= 500))
+          ) {
+            await this.delay(attempt);
+            continue;
+          }
+          
+          throw error;
+        }
+
+        const responseHeaders = Object.fromEntries(response.headers);
+
+        // Handle 204 No Content
+        if (response.status === 204) {
+          return { data: undefined as T, headers: responseHeaders };
+        }
+
+        // Handle HEAD requests
+        if (options.method === 'HEAD') {
+          return {
+            data: {
+              headers: responseHeaders,
+              status: response.status,
+            } as T,
+            headers: responseHeaders,
+          };
+        }
+
+        const data = await response.json() as T;
+        return { data, headers: responseHeaders };
+        
+      } catch (error) {
+        if (error instanceof SDKError) {
+          throw error;
+        }
+        
+        // Network errors or timeouts
+        lastError = error as Error;
+        
+        if (attempt < maxRetries && this.shouldRetry(options.method)) {
+          await this.delay(attempt);
+          continue;
+        }
+        
+        throw new SDKError(
+          `Request failed: ${lastError.message}`,
+          undefined,
+          'network_error',
+          { originalError: lastError.message },
+        );
+      }
+    }
+
+    throw new SDKError(
+      `Request failed after ${maxRetries + 1} attempts`,
+      undefined,
+      'max_retries_exceeded',
+      { lastError: lastError?.message },
+    );
   }
 }
