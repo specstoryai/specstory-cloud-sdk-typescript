@@ -2,7 +2,7 @@
 import { Client } from '../src';
 
 async function demonstratePerformance() {
-  const apiKey = process.env.SPECSTORY_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8';
+  const apiKey = process.env.SPECSTORY_API_KEY || 'your-api-key-here';
   const client = new Client({ apiKey });
 
   console.log('Testing request deduplication...\n');
