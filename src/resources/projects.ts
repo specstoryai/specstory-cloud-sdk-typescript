@@ -45,13 +45,13 @@ export class Projects extends BaseResource {
    * @param projectId - The project ID to delete
    * @returns Deletion details including the deleted project
    */
-  async delete(projectId: string): Promise<DeleteProjectResponse['data']> {
+  async delete(projectId: string): Promise<boolean> {
     const response = await this.request<DeleteProjectResponse>({
       method: 'DELETE',
       path: `/api/v1/projects/${projectId}`,
     });
 
-    return response.data;
+    return response.success;
   }
 
   /**
