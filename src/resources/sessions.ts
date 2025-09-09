@@ -10,6 +10,8 @@ import type {
   PaginationOptions,
   RequestOptions
 } from '../types';
+import { LRUCache } from '../cache';
+import { HTTPClient } from '../http';
 
 export interface WriteSessionOptions extends RequestOptions {
   projectName?: string;
@@ -17,6 +19,12 @@ export interface WriteSessionOptions extends RequestOptions {
 }
 
 export class Sessions extends BaseResource {
+  constructor(
+    protected http: HTTPClient,
+    private cache: LRUCache | null = null
+  ) {
+    super(http);
+  }
   /**
    * Write (create or update) a session
    * @param projectId - The project ID
@@ -103,6 +111,17 @@ export class Sessions extends BaseResource {
     sessionId: string,
     ifNoneMatch?: string
   ): Promise<(SessionDetail & { etag?: string }) | null> {
+    const cacheKey = `session:${projectId}:${sessionId}`;
+    
+    // Check cache if no explicit etag provided
+    if (!ifNoneMatch && this.cache) {
+      const cached = this.cache.getEntry(cacheKey);
+      if (cached) {
+        // Use cached etag for conditional request
+        ifNoneMatch = cached.etag;
+      }
+    }
+
     const headers: Record<string, string> = {
       'Accept': 'application/json',
     };
@@ -121,13 +140,27 @@ export class Sessions extends BaseResource {
       // Extract ETag from response headers
       const etag = response.headers?.['etag'];
       
-      return {
+      const result = {
         ...response.data.data.session,
         ...(etag && { etag })
       };
+
+      // Cache the response
+      if (this.cache && etag) {
+        this.cache.set(cacheKey, result, { etag, ttl: 300000 }); // 5 minute TTL
+      }
+
+      return result;
     } catch (error: any) {
       // Return null for 304 Not Modified
       if (error.status === 304) {
+        // Return cached version if available
+        if (this.cache) {
+          const cached = this.cache.get(cacheKey);
+          if (cached) {
+            return cached;
+          }
+        }
         return null;
       }
       throw error;

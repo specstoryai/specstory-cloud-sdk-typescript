@@ -16,3 +16,5 @@ export {
 } from './errors';
 export * from './types';
 export type { SearchOptions, SearchResult } from './resources/graphql';
+export { LRUCache } from './cache';
+export type { CacheOptions, CacheEntry } from './cache';

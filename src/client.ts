@@ -2,15 +2,18 @@ import { HTTPClient } from './http';
 import { Projects } from './resources/projects';
 import { Sessions } from './resources/sessions';
 import { GraphQL } from './resources/graphql';
+import { LRUCache, CacheOptions } from './cache';
 
 export interface ClientOptions {
   apiKey: string;
   baseUrl?: string;
   timeoutMs?: number;
+  cache?: CacheOptions | false;
 }
 
 export class Client {
   private readonly http: HTTPClient;
+  private readonly cache: LRUCache | null;
   
   public readonly projects: Projects;
   public readonly sessions: Sessions;
@@ -31,8 +34,25 @@ export class Client {
       timeoutMs: options.timeoutMs || 30000,
     });
 
+    // Initialize cache if not disabled
+    this.cache = options.cache === false ? null : new LRUCache(options.cache);
+
     this.projects = new Projects(this.http);
-    this.sessions = new Sessions(this.http);
+    this.sessions = new Sessions(this.http, this.cache);
     this.graphql = new GraphQL(this.http);
+  }
+
+  /**
+   * Clear the response cache
+   */
+  clearCache(): void {
+    this.cache?.clear();
+  }
+
+  /**
+   * Invalidate cache entries matching a pattern
+   */
+  invalidateCache(pattern: RegExp): void {
+    this.cache?.invalidatePattern(pattern);
   }
 }
