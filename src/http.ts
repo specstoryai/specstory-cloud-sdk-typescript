@@ -1,4 +1,9 @@
-import { SDKError } from './errors';
+import { 
+  SDKError, 
+  NetworkError, 
+  TimeoutError,
+  ErrorContext,
+} from './errors';
 import {
   SDK_VERSION,
   SDK_LANGUAGE,
@@ -12,6 +17,8 @@ interface HTTPClientConfig {
   apiKey: string;
   baseUrl: string;
   timeoutMs: number;
+  keepAlive?: boolean;
+  maxConnections?: number;
 }
 
 export interface RequestOptions {
@@ -30,12 +37,47 @@ export interface WithHeaders<T> {
 }
 
 export class HTTPClient {
+  private requestQueue = new Map<string, Promise<any>>();
+  
   constructor(private readonly config: HTTPClientConfig) {}
 
   async request<T>(options: RequestOptions): Promise<T> {
     const url = `${this.config.baseUrl}${options.path}`;
     const timeoutMs = options.timeoutMs ?? this.config.timeoutMs;
     const maxRetries = options.retries ?? DEFAULT_MAX_RETRIES;
+    const startTime = Date.now();
+    
+    // Request deduplication for GET requests
+    if (options.method === 'GET') {
+      const requestKey = `${options.method}:${url}`;
+      const existingRequest = this.requestQueue.get(requestKey);
+      if (existingRequest) {
+        return existingRequest as Promise<T>;
+      }
+      
+      const requestPromise = this.performRequest<T>(options, url, timeoutMs, maxRetries, startTime);
+      this.requestQueue.set(requestKey, requestPromise);
+      
+      try {
+        const result = await requestPromise;
+        this.requestQueue.delete(requestKey);
+        return result;
+      } catch (error) {
+        this.requestQueue.delete(requestKey);
+        throw error;
+      }
+    }
+    
+    return this.performRequest<T>(options, url, timeoutMs, maxRetries, startTime);
+  }
+  
+  private async performRequest<T>(
+    options: RequestOptions,
+    url: string,
+    timeoutMs: number,
+    maxRetries: number,
+    startTime: number
+  ): Promise<T> {
     
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.config.apiKey}`,
@@ -67,7 +109,14 @@ export class HTTPClient {
         clearTimeout(timeout);
 
         if (!response.ok) {
-          const error = SDKError.fromResponse(response);
+          const context: ErrorContext = {
+            method: options.method,
+            url,
+            timestamp: new Date(),
+            duration: Date.now() - startTime,
+            retryCount: attempt,
+          };
+          const error = SDKError.fromResponse(response, context);
           
           // Only retry on specific status codes and methods
           if (
@@ -110,20 +159,41 @@ export class HTTPClient {
           continue;
         }
         
-        throw new SDKError(
+        const context: ErrorContext = {
+          method: options.method,
+          url,
+          timestamp: new Date(),
+          duration: Date.now() - startTime,
+          retryCount: attempt,
+        };
+        
+        // Check if it's a timeout error
+        if (lastError.name === 'AbortError') {
+          throw new TimeoutError(
+            `Request timed out after ${timeoutMs}ms`,
+            timeoutMs,
+            context
+          );
+        }
+        
+        throw new NetworkError(
           `Request failed: ${lastError.message}`,
-          undefined,
-          'network_error',
-          { originalError: lastError.message },
+          lastError,
+          context
         );
       }
     }
 
-    throw new SDKError(
+    throw new NetworkError(
       `Request failed after ${maxRetries + 1} attempts`,
-      undefined,
-      'max_retries_exceeded',
-      { lastError: lastError?.message },
+      lastError,
+      {
+        method: options.method,
+        url,
+        timestamp: new Date(),
+        duration: Date.now() - startTime,
+        retryCount: maxRetries + 1,
+      }
     );
   }
 
@@ -141,6 +211,39 @@ export class HTTPClient {
     const url = `${this.config.baseUrl}${options.path}`;
     const timeoutMs = options.timeoutMs ?? this.config.timeoutMs;
     const maxRetries = options.retries ?? DEFAULT_MAX_RETRIES;
+    const startTime = Date.now();
+    
+    // Request deduplication for GET requests
+    if (options.method === 'GET') {
+      const requestKey = `${options.method}:${url}:with-headers`;
+      const existingRequest = this.requestQueue.get(requestKey);
+      if (existingRequest) {
+        return existingRequest as Promise<WithHeaders<T>>;
+      }
+      
+      const requestPromise = this.performRequestWithHeaders<T>(options, url, timeoutMs, maxRetries, startTime);
+      this.requestQueue.set(requestKey, requestPromise);
+      
+      try {
+        const result = await requestPromise;
+        this.requestQueue.delete(requestKey);
+        return result;
+      } catch (error) {
+        this.requestQueue.delete(requestKey);
+        throw error;
+      }
+    }
+    
+    return this.performRequestWithHeaders<T>(options, url, timeoutMs, maxRetries, startTime);
+  }
+  
+  private async performRequestWithHeaders<T>(
+    options: RequestOptions,
+    url: string,
+    timeoutMs: number,
+    maxRetries: number,
+    startTime: number
+  ): Promise<WithHeaders<T>> {
     
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.config.apiKey}`,
@@ -172,7 +275,14 @@ export class HTTPClient {
         clearTimeout(timeout);
 
         if (!response.ok) {
-          const error = SDKError.fromResponse(response);
+          const context: ErrorContext = {
+            method: options.method,
+            url,
+            timestamp: new Date(),
+            duration: Date.now() - startTime,
+            retryCount: attempt,
+          };
+          const error = SDKError.fromResponse(response, context);
           
           // Only retry on specific status codes and methods
           if (
@@ -221,20 +331,41 @@ export class HTTPClient {
           continue;
         }
         
-        throw new SDKError(
+        const context: ErrorContext = {
+          method: options.method,
+          url,
+          timestamp: new Date(),
+          duration: Date.now() - startTime,
+          retryCount: attempt,
+        };
+        
+        // Check if it's a timeout error
+        if (lastError.name === 'AbortError') {
+          throw new TimeoutError(
+            `Request timed out after ${timeoutMs}ms`,
+            timeoutMs,
+            context
+          );
+        }
+        
+        throw new NetworkError(
           `Request failed: ${lastError.message}`,
-          undefined,
-          'network_error',
-          { originalError: lastError.message },
+          lastError,
+          context
         );
       }
     }
 
-    throw new SDKError(
+    throw new NetworkError(
       `Request failed after ${maxRetries + 1} attempts`,
-      undefined,
-      'max_retries_exceeded',
-      { lastError: lastError?.message },
+      lastError,
+      {
+        method: options.method,
+        url,
+        timestamp: new Date(),
+        duration: Date.now() - startTime,
+        retryCount: maxRetries + 1,
+      }
     );
   }
 }
