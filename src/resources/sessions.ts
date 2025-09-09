@@ -210,4 +210,28 @@ export class Sessions extends BaseResource {
       throw error;
     }
   }
+
+  /**
+   * Get recent sessions across all projects
+   * @param limit - Number of sessions to return (1-100, default 5)
+   * @returns Array of recent session summaries
+   */
+  async recent(limit?: number): Promise<SessionSummary[]> {
+    const params = new URLSearchParams();
+    if (limit !== undefined) {
+      params.append('limit', limit.toString());
+    }
+
+    const queryString = params.toString();
+    const path = queryString 
+      ? `/api/v1/sessions/recent?${queryString}`
+      : '/api/v1/sessions/recent';
+
+    const response = await this.request<ListSessionsResponse>({
+      method: 'GET',
+      path,
+    });
+
+    return response.data.sessions;
+  }
 }

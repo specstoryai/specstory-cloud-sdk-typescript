@@ -74,7 +74,7 @@ async function main() {
       // Search sessions using GraphQL
       log('\nSearching sessions...');
       const searchResults = await client.graphql.search('test', { limit: 10 });
-      log(`Search found ${(searchResults as any).total || 0} results`);
+      log(`Search found ${searchResults.total} results`);
     }
   } catch (error) {
     console.error('Error:', error);

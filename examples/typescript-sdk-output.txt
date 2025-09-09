@@ -4,7 +4,7 @@ Found 2 projects
 Using project: Test Session (833c-d926-f753-7b4a)
 
 Creating a new session...
-Created session: d495a6ba-e134-4926-9cdb-a06a8cd8cebd
+Created session: f6336b59-575c-4104-85dd-361c56216049
 
 Listing sessions...
 Found 2 sessions
@@ -12,15 +12,14 @@ Found 2 sessions
 Reading session details...
 Session name: Test Session
 Markdown size: 47 bytes
-ETag: W/"4182a8e464064d5bf8a8f9f0a214a16ab5d21bdfacf9418ceb3ab413d3b8d251"
+ETag: W/"049e015ffee61b994eb75ef2fa35953538ad78da1d40c9972ee8bccb58995b6b"
 
 Checking session metadata...
 Session exists: true
-Last modified: Tue, 09 Sep 2025 00:11:17 GMT
+Last modified: Tue, 09 Sep 2025 16:30:15 GMT
 
 Deleting session...
 Session deleted: true
 
 Searching sessions...
-
-Error: SDKError: Bad Request - The request was invalid
+Search found 7 results
