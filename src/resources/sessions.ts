@@ -294,7 +294,7 @@ export class Sessions extends BaseResource {
    */
   async writeAndRead(
     projectId: string,
-    data: WriteSessionRequest,
+    data: Omit<WriteSessionRequest, 'projectName'>,
     options?: WriteSessionOptions,
   ): Promise<SessionDetail & { etag?: string }> {
     // First write the session
