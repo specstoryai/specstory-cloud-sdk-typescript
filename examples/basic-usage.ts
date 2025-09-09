@@ -1,7 +1,17 @@
 #!/usr/bin/env tsx
 import { Client } from '@specstory/sdk';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function main() {
+  const outputPath = path.join(__dirname, 'typescript-sdk-output.txt');
+  const output: string[] = [];
+  
+  // Helper function to log to both console and file
+  const log = (message: string) => {
+    console.log(message);
+    output.push(message);
+  };
   // Initialize the client with your API key
   const client = new Client({
     apiKey: process.env.SPECSTORY_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8',
@@ -9,16 +19,16 @@ async function main() {
 
   try {
     // List all projects
-    console.log('Fetching projects...');
+    log('Fetching projects...');
     const projects = await client.projects.list();
-    console.log(`Found ${projects.length} projects`);
+    log(`Found ${projects.length} projects`);
 
     if (projects.length > 0) {
       const project = projects[0];
-      console.log(`\nUsing project: ${project.name} (${project.id})`);
+      log(`\nUsing project: ${project.name} (${project.id})`);
 
       // Create a new session
-      console.log('\nCreating a new session...');
+      log('\nCreating a new session...');
       const session = await client.sessions.write(project.id, {
         name: 'Test Session',
         markdown: '# Test Session\n\nThis is a test session content.',
@@ -30,45 +40,53 @@ async function main() {
       }, {
         idempotencyKey: 'test-session-001',
       });
-      console.log(`Created session: ${session.sessionId}`);
+      log(`Created session: ${session.sessionId}`);
 
       // List sessions for the project
-      console.log('\nListing sessions...');
+      log('\nListing sessions...');
       const sessions = await client.sessions.list(project.id);
-      console.log(`Found ${sessions.length} sessions`);
+      log(`Found ${sessions.length} sessions`);
 
       // Read the created session
       if (session.sessionId) {
-        console.log('\nReading session details...');
+        log('\nReading session details...');
         const details = await client.sessions.read(project.id, session.sessionId);
         if (details) {
-          console.log(`Session name: ${details.name}`);
-          console.log(`Markdown size: ${details.markdownSize} bytes`);
-          console.log(`ETag: ${details.etag}`);
+          log(`Session name: ${details.name}`);
+          log(`Markdown size: ${details.markdownSize} bytes`);
+          log(`ETag: ${details.etag}`);
         }
 
         // Check session metadata with HEAD request
-        console.log('\nChecking session metadata...');
+        log('\nChecking session metadata...');
         const metadata = await client.sessions.head(project.id, session.sessionId);
         if (metadata && metadata.exists) {
-          console.log(`Session exists: ${metadata.exists}`);
-          console.log(`Last modified: ${metadata.lastModified}`);
+          log(`Session exists: ${metadata.exists}`);
+          log(`Last modified: ${metadata.lastModified}`);
         }
 
         // Delete the session
-        console.log('\nDeleting session...');
+        log('\nDeleting session...');
         const deleted = await client.sessions.delete(project.id, session.sessionId);
-        console.log(`Session deleted: ${deleted}`);
+        log(`Session deleted: ${deleted}`);
       }
 
       // Search sessions using GraphQL
-      console.log('\nSearching sessions...');
+      log('\nSearching sessions...');
       const searchResults = await client.graphql.search('test', { limit: 10 });
-      console.log(`Search found ${searchResults.total || 0} results`);
+      log(`Search found ${(searchResults as any).total || 0} results`);
     }
   } catch (error) {
     console.error('Error:', error);
+    output.push(`\nError: ${error}`);
   }
+  
+  // Write output to file
+  fs.writeFileSync(outputPath, output.join('\n'));
+  console.log(`\nOutput written to: ${outputPath}`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});
