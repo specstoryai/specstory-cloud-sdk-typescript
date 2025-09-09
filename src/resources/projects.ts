@@ -1,10 +1,10 @@
 import { BaseResource } from './base';
-import type { 
-  Project, 
+import type {
+  Project,
   ListProjectsResponse,
   UpdateProjectRequest,
   UpdateProjectResponse,
-  DeleteProjectResponse
+  DeleteProjectResponse,
 } from '../types';
 
 export class Projects extends BaseResource {
@@ -29,7 +29,7 @@ export class Projects extends BaseResource {
    */
   async update(
     projectId: string,
-    data: UpdateProjectRequest
+    data: UpdateProjectRequest,
   ): Promise<UpdateProjectResponse['data']> {
     const response = await this.request<UpdateProjectResponse>({
       method: 'PATCH',
@@ -52,5 +52,20 @@ export class Projects extends BaseResource {
     });
 
     return response.data;
+  }
+
+  /**
+   * Get a project by name (convenience method)
+   * @param name - The project name to search for
+   * @returns The first project with matching name, or undefined if not found
+   * @example
+   * const project = await client.projects.getByName('My Project');
+   * if (project) {
+   *   console.log(`Found project: ${project.id}`);
+   * }
+   */
+  async getByName(name: string): Promise<Project | undefined> {
+    const projects = await this.list();
+    return projects.find((p) => p.name === name);
   }
 }

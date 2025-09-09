@@ -1,6 +1,6 @@
 export { Client } from './client';
 export type { ClientOptions } from './client';
-export { 
+export {
   SDKError,
   NetworkError,
   TimeoutError,
@@ -18,3 +18,5 @@ export * from './types';
 export type { SearchOptions, SearchResult } from './resources/graphql';
 export { LRUCache } from './cache';
 export type { CacheOptions, CacheEntry } from './cache';
+export { DebugLogger } from './debug';
+export type { DebugOptions } from './debug';

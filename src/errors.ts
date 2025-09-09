@@ -30,7 +30,7 @@ export abstract class SDKError extends Error {
     this.name = this.constructor.name;
     this.details = details || {};
     this.context = context || {};
-    
+
     // Maintains proper stack trace for where our error was thrown
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
@@ -42,15 +42,15 @@ export abstract class SDKError extends Error {
    */
   getCurlCommand(): string | undefined {
     if (!this.context.method || !this.context.url) return undefined;
-    
+
     const parts = ['curl'];
     parts.push('-X', this.context.method);
     parts.push(`'${this.context.url}'`);
-    
+
     if (this.context.requestId) {
       parts.push('-H', `'x-request-id: ${this.context.requestId}'`);
     }
-    
+
     return parts.join(' ');
   }
 
@@ -68,7 +68,7 @@ export abstract class SDKError extends Error {
   static fromResponse(response: Response, context?: ErrorContext): SDKError {
     const status = response.status;
     const requestId = response.headers.get('x-request-id') || undefined;
-    
+
     const errorContext: ErrorContext = {
       ...context,
       requestId: requestId || context?.requestId,
@@ -92,10 +92,7 @@ export abstract class SDKError extends Error {
           errorContext,
         );
       case 404:
-        return new NotFoundError(
-          'The requested resource does not exist',
-          errorContext,
-        );
+        return new NotFoundError('The requested resource does not exist', errorContext);
       case 429:
         const retryAfter = response.headers.get('retry-after');
         return new RateLimitError(
@@ -107,17 +104,9 @@ export abstract class SDKError extends Error {
       case 502:
       case 503:
       case 504:
-        return new ServerError(
-          `Server error: ${status}`,
-          status,
-          errorContext,
-        );
+        return new ServerError(`Server error: ${status}`, status, errorContext);
       default:
-        return new UnknownError(
-          `Unexpected error: ${status}`,
-          status,
-          errorContext,
-        );
+        return new UnknownError(`Unexpected error: ${status}`, status, errorContext);
     }
   }
 }
@@ -126,11 +115,20 @@ export abstract class SDKError extends Error {
  * Network-related errors (connection failures, timeouts)
  */
 export class NetworkError extends SDKError {
-  constructor(message: string, public readonly cause?: Error, context?: ErrorContext) {
-    super(message, undefined, {
-      code: 'network_error',
-      suggestion: 'Check your internet connection and try again',
-    }, context);
+  constructor(
+    message: string,
+    public readonly cause?: Error,
+    context?: ErrorContext,
+  ) {
+    super(
+      message,
+      undefined,
+      {
+        code: 'network_error',
+        suggestion: 'Check your internet connection and try again',
+      },
+      context,
+    );
   }
 }
 
@@ -138,12 +136,21 @@ export class NetworkError extends SDKError {
  * Validation errors for bad requests
  */
 export class ValidationError extends SDKError {
-  constructor(message: string, context?: ErrorContext, public readonly fields?: Record<string, string[]>) {
-    super(message, 400, {
-      code: 'validation_error',
-      details: fields,
-      suggestion: 'Check the request parameters and try again',
-    }, context);
+  constructor(
+    message: string,
+    context?: ErrorContext,
+    public readonly fields?: Record<string, string[]>,
+  ) {
+    super(
+      message,
+      400,
+      {
+        code: 'validation_error',
+        details: fields,
+        suggestion: 'Check the request parameters and try again',
+      },
+      context,
+    );
   }
 }
 
@@ -152,10 +159,15 @@ export class ValidationError extends SDKError {
  */
 export class AuthenticationError extends SDKError {
   constructor(message: string, details?: ErrorDetails, context?: ErrorContext) {
-    super(message, 401, {
-      code: 'authentication_error',
-      ...details,
-    }, context);
+    super(
+      message,
+      401,
+      {
+        code: 'authentication_error',
+        ...details,
+      },
+      context,
+    );
   }
 }
 
@@ -164,10 +176,15 @@ export class AuthenticationError extends SDKError {
  */
 export class PermissionError extends SDKError {
   constructor(message: string, context?: ErrorContext) {
-    super(message, 403, {
-      code: 'permission_error',
-      suggestion: 'Ensure you have the necessary permissions for this resource',
-    }, context);
+    super(
+      message,
+      403,
+      {
+        code: 'permission_error',
+        suggestion: 'Ensure you have the necessary permissions for this resource',
+      },
+      context,
+    );
   }
 }
 
@@ -176,10 +193,15 @@ export class PermissionError extends SDKError {
  */
 export class NotFoundError extends SDKError {
   constructor(message: string, context?: ErrorContext) {
-    super(message, 404, {
-      code: 'not_found',
-      suggestion: 'Verify the resource ID and try again',
-    }, context);
+    super(
+      message,
+      404,
+      {
+        code: 'not_found',
+        suggestion: 'Verify the resource ID and try again',
+      },
+      context,
+    );
   }
 }
 
@@ -190,18 +212,23 @@ export class RateLimitError extends SDKError {
   public readonly retryAfter: Date | undefined;
 
   constructor(message: string, retryAfterSeconds?: number, context?: ErrorContext) {
-    const retryAfter = retryAfterSeconds 
+    const retryAfter = retryAfterSeconds
       ? new Date(Date.now() + retryAfterSeconds * 1000)
       : undefined;
-      
-    super(message, 429, {
-      code: 'rate_limit',
-      details: { retryAfterSeconds },
-      suggestion: retryAfter 
-        ? `Retry after ${retryAfter.toISOString()}`
-        : 'Reduce request frequency and try again',
-    }, context);
-    
+
+    super(
+      message,
+      429,
+      {
+        code: 'rate_limit',
+        details: { retryAfterSeconds },
+        suggestion: retryAfter
+          ? `Retry after ${retryAfter.toISOString()}`
+          : 'Reduce request frequency and try again',
+      },
+      context,
+    );
+
     this.retryAfter = retryAfter;
   }
 }
@@ -211,10 +238,15 @@ export class RateLimitError extends SDKError {
  */
 export class ServerError extends SDKError {
   constructor(message: string, status: number, context?: ErrorContext) {
-    super(message, status, {
-      code: 'server_error',
-      suggestion: 'The server encountered an error. Please try again later',
-    }, context);
+    super(
+      message,
+      status,
+      {
+        code: 'server_error',
+        suggestion: 'The server encountered an error. Please try again later',
+      },
+      context,
+    );
   }
 }
 
@@ -223,17 +255,22 @@ export class ServerError extends SDKError {
  */
 export class GraphQLError extends SDKError {
   constructor(
-    message: string, 
+    message: string,
     public readonly errors: Array<{ message: string; extensions?: any }>,
     public readonly query?: string,
     public readonly variables?: Record<string, any>,
     context?: ErrorContext,
   ) {
-    super(message, 200, {
-      code: 'graphql_error',
-      details: { errors, query, variables },
-      suggestion: 'Check the GraphQL query syntax and variables',
-    }, context);
+    super(
+      message,
+      200,
+      {
+        code: 'graphql_error',
+        details: { errors, query, variables },
+        suggestion: 'Check the GraphQL query syntax and variables',
+      },
+      context,
+    );
   }
 }
 
@@ -242,10 +279,15 @@ export class GraphQLError extends SDKError {
  */
 export class UnknownError extends SDKError {
   constructor(message: string, status?: number, context?: ErrorContext) {
-    super(message, status, {
-      code: 'unknown_error',
-      suggestion: 'An unexpected error occurred. Please report this issue',
-    }, context);
+    super(
+      message,
+      status,
+      {
+        code: 'unknown_error',
+        suggestion: 'An unexpected error occurred. Please report this issue',
+      },
+      context,
+    );
   }
 }
 
@@ -253,12 +295,21 @@ export class UnknownError extends SDKError {
  * Timeout errors
  */
 export class TimeoutError extends SDKError {
-  constructor(message: string, public readonly timeoutMs: number, context?: ErrorContext) {
-    super(message, undefined, {
-      code: 'timeout',
-      details: { timeoutMs },
-      suggestion: `Request timed out after ${timeoutMs}ms. Try increasing the timeout`,
-    }, context);
+  constructor(
+    message: string,
+    public readonly timeoutMs: number,
+    context?: ErrorContext,
+  ) {
+    super(
+      message,
+      undefined,
+      {
+        code: 'timeout',
+        details: { timeoutMs },
+        suggestion: `Request timed out after ${timeoutMs}ms. Try increasing the timeout`,
+      },
+      context,
+    );
   }
 }
 

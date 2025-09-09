@@ -23,15 +23,15 @@ export interface SearchResult {
 export class GraphQL extends BaseResource {
   async search(searchQuery: string, options?: SearchOptions): Promise<SearchResult> {
     const variables: any = { query: searchQuery };
-    
+
     if (options?.limit !== undefined) {
       variables.limit = options.limit;
     }
-    
+
     if (options?.filters) {
       variables.filters = options.filters;
     }
-    
+
     const query = `
       query SearchSessions($query: String!, $filters: SessionFilters, $limit: Int) {
         searchSessions(query: $query, filters: $filters, limit: $limit) {
@@ -49,8 +49,11 @@ export class GraphQL extends BaseResource {
         }
       }
     `;
-    
-    const response = await this.request<{ data?: { searchSessions: SearchResult }; errors?: any[] }>({
+
+    const response = await this.request<{
+      data?: { searchSessions: SearchResult };
+      errors?: any[];
+    }>({
       method: 'POST',
       path: '/api/v1/graphql',
       body: {
@@ -58,28 +61,18 @@ export class GraphQL extends BaseResource {
         variables,
       },
     });
-    
+
     if (response.errors && response.errors.length > 0) {
-      throw new GraphQLError(
-        'GraphQL query failed',
-        response.errors,
-        query,
-        variables
-      );
+      throw new GraphQLError('GraphQL query failed', response.errors, query, variables);
     }
-    
+
     if (!response.data?.searchSessions) {
-      throw new GraphQLError(
-        'No data returned from GraphQL query',
-        [],
-        query,
-        variables
-      );
+      throw new GraphQLError('No data returned from GraphQL query', [], query, variables);
     }
-    
+
     return response.data.searchSessions;
   }
-  
+
   async query<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
     const response = await this.request<{ data?: T; errors?: any[] }>({
       method: 'POST',
@@ -89,16 +82,11 @@ export class GraphQL extends BaseResource {
         variables: variables || {},
       },
     });
-    
+
     if (response.errors && response.errors.length > 0) {
-      throw new GraphQLError(
-        'GraphQL query failed',
-        response.errors,
-        query,
-        variables
-      );
+      throw new GraphQLError('GraphQL query failed', response.errors, query, variables);
     }
-    
+
     return response.data as T;
   }
 }

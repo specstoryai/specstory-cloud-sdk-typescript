@@ -1,5 +1,5 @@
 import { BaseResource } from './base';
-import type { 
+import type {
   SessionSummary,
   SessionDetail,
   ListSessionsResponse,
@@ -8,7 +8,7 @@ import type {
   SessionDetailResponse,
   DeleteSessionResponse,
   PaginationOptions,
-  RequestOptions
+  RequestOptions,
 } from '../types';
 import { LRUCache } from '../cache';
 import { HTTPClient } from '../http';
@@ -21,7 +21,7 @@ export interface WriteSessionOptions extends RequestOptions {
 export class Sessions extends BaseResource {
   constructor(
     protected http: HTTPClient,
-    private cache: LRUCache | null = null
+    private cache: LRUCache | null = null,
   ) {
     super(http);
   }
@@ -35,7 +35,7 @@ export class Sessions extends BaseResource {
   async write(
     projectId: string,
     data: Omit<WriteSessionRequest, 'projectName'>,
-    options?: WriteSessionOptions
+    options?: WriteSessionOptions,
   ): Promise<WriteSessionResponse['data'] & { etag?: string }> {
     const body: WriteSessionRequest = {
       ...data,
@@ -55,10 +55,10 @@ export class Sessions extends BaseResource {
 
     // Extract ETag from headers if available
     const etag = response.headers?.['etag'];
-    
+
     return {
       ...response.data.data,
-      ...(etag && { etag })
+      ...(etag && { etag }),
     };
   }
 
@@ -67,11 +67,14 @@ export class Sessions extends BaseResource {
    * @param projectId - The project ID
    * @param options - Pagination options
    * @returns Array of session summaries with ETags
+   * @example
+   * // List all sessions for a project
+   * const sessions = await client.sessions.list('project-id');
+   * sessions.forEach(session => {
+   *   console.log(`${session.name}: ${session.id}`);
+   * });
    */
-  async list(
-    projectId: string,
-    _options?: PaginationOptions
-  ): Promise<SessionSummary[]> {
+  async list(projectId: string, _options?: PaginationOptions): Promise<SessionSummary[]> {
     const response = await this.request<ListSessionsResponse>({
       method: 'GET',
       path: `/api/v1/projects/${projectId}/sessions`,
@@ -88,12 +91,12 @@ export class Sessions extends BaseResource {
    */
   async *listPaginated(
     projectId: string,
-    options?: PaginationOptions
+    options?: PaginationOptions,
   ): AsyncGenerator<SessionSummary, void, unknown> {
     // For now, yield all sessions at once
     // TODO: Implement proper cursor-based pagination when API supports it
     const sessions = await this.list(projectId, options);
-    
+
     for (const session of sessions) {
       yield session;
     }
@@ -105,14 +108,28 @@ export class Sessions extends BaseResource {
    * @param sessionId - The session ID
    * @param ifNoneMatch - Optional ETag for conditional request
    * @returns Session details or null if not modified
+   * @example
+   * // Read a session
+   * const session = await client.sessions.read(projectId, sessionId);
+   * if (session) {
+   *   console.log(`Events: ${session.events.length}`);
+   *   console.log(`ETag: ${session.etag}`);
+   * }
+   *
+   * @example
+   * // Conditional read with ETag
+   * const session = await client.sessions.read(projectId, sessionId, lastEtag);
+   * if (session === null) {
+   *   console.log('Session has not changed');
+   * }
    */
   async read(
     projectId: string,
     sessionId: string,
-    ifNoneMatch?: string
+    ifNoneMatch?: string,
   ): Promise<(SessionDetail & { etag?: string }) | null> {
     const cacheKey = `session:${projectId}:${sessionId}`;
-    
+
     // Check cache if no explicit etag provided
     if (!ifNoneMatch && this.cache) {
       const cached = this.cache.getEntry(cacheKey);
@@ -123,9 +140,9 @@ export class Sessions extends BaseResource {
     }
 
     const headers: Record<string, string> = {
-      'Accept': 'application/json',
+      Accept: 'application/json',
     };
-    
+
     if (ifNoneMatch) {
       headers['If-None-Match'] = ifNoneMatch;
     }
@@ -139,10 +156,10 @@ export class Sessions extends BaseResource {
 
       // Extract ETag from response headers
       const etag = response.headers?.['etag'];
-      
+
       const result = {
         ...response.data.data.session,
-        ...(etag && { etag })
+        ...(etag && { etag }),
       };
 
       // Cache the response
@@ -173,10 +190,7 @@ export class Sessions extends BaseResource {
    * @param sessionId - The session ID
    * @returns Success confirmation
    */
-  async delete(
-    projectId: string,
-    sessionId: string
-  ): Promise<boolean> {
+  async delete(projectId: string, sessionId: string): Promise<boolean> {
     const response = await this.request<DeleteSessionResponse>({
       method: 'DELETE',
       path: `/api/v1/projects/${projectId}/sessions/${sessionId}`,
@@ -195,7 +209,7 @@ export class Sessions extends BaseResource {
   async head(
     projectId: string,
     sessionId: string,
-    ifNoneMatch?: string
+    ifNoneMatch?: string,
   ): Promise<{
     exists: boolean;
     etag?: string;
@@ -205,7 +219,7 @@ export class Sessions extends BaseResource {
     rawDataSize?: number;
   } | null> {
     const headers: Record<string, string> = {};
-    
+
     if (ifNoneMatch) {
       headers['If-None-Match'] = ifNoneMatch;
     }
@@ -220,8 +234,8 @@ export class Sessions extends BaseResource {
       return {
         exists: true,
         etag: response.headers?.['etag'],
-        contentLength: response.headers?.['content-length'] 
-          ? parseInt(response.headers['content-length'], 10) 
+        contentLength: response.headers?.['content-length']
+          ? parseInt(response.headers['content-length'], 10)
           : undefined,
         lastModified: response.headers?.['last-modified'],
         markdownSize: response.headers?.['x-markdown-size']
@@ -256,9 +270,7 @@ export class Sessions extends BaseResource {
     }
 
     const queryString = params.toString();
-    const path = queryString 
-      ? `/api/v1/sessions/recent?${queryString}`
-      : '/api/v1/sessions/recent';
+    const path = queryString ? `/api/v1/sessions/recent?${queryString}` : '/api/v1/sessions/recent';
 
     const response = await this.request<ListSessionsResponse>({
       method: 'GET',
@@ -266,5 +278,36 @@ export class Sessions extends BaseResource {
     });
 
     return response.data.sessions;
+  }
+
+  /**
+   * Write and immediately read a session (convenience method)
+   * @param projectId - The project ID
+   * @param data - The session data to write
+   * @param options - Optional write options
+   * @returns The written session details
+   * @example
+   * const session = await client.sessions.writeAndRead(projectId, {
+   *   events: [...],
+   *   metadata: { clientName: 'test' }
+   * });
+   */
+  async writeAndRead(
+    projectId: string,
+    data: WriteSessionRequest,
+    options?: WriteSessionOptions,
+  ): Promise<SessionDetail & { etag?: string }> {
+    // First write the session
+    const writeResult = await this.write(projectId, data, options);
+
+    // Then read it back with full details
+    const sessionId = writeResult.sessionId;
+    const fullSession = await this.read(projectId, sessionId);
+
+    if (!fullSession) {
+      throw new Error('Failed to read session after write');
+    }
+
+    return fullSession;
   }
 }
