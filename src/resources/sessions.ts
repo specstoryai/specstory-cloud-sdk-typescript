@@ -13,6 +13,7 @@ import type {
 
 export interface WriteSessionOptions extends RequestOptions {
   projectName?: string;
+  sessionId?: string;
 }
 
 export class Sessions extends BaseResource {
@@ -33,9 +34,12 @@ export class Sessions extends BaseResource {
       projectName: options?.projectName || data.name,
     };
 
+    // Generate session ID if not provided
+    const sessionId = options?.sessionId || crypto.randomUUID();
+
     const response = await this.requestWithHeaders<WriteSessionResponse>({
       method: 'PUT',
-      path: `/api/v1/projects/${projectId}/sessions`,
+      path: `/api/v1/projects/${projectId}/sessions/${sessionId}`,
       body,
       idempotencyKey: options?.idempotencyKey,
       timeoutMs: options?.timeoutMs,
