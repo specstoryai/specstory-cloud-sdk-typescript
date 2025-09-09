@@ -8,6 +8,24 @@ This is the internal development guide for the SpecStory TypeScript SDK. For pub
 - npm or yarn
 - TypeScript knowledge
 
+## Quick Local Setup
+
+Want to use the SDK locally right away? Here's the fastest way:
+
+```bash
+# From monorepo root
+cd typescript && npm install && npm run build && npm link
+
+# Then in your project
+npm link @specstory/sdk
+```
+
+That's it! Now you can use the SDK:
+```typescript
+import { Client } from '@specstory/sdk';
+const client = new Client({ apiKey: 'your-api-key-here' });
+```
+
 ## Project Structure
 
 ```
