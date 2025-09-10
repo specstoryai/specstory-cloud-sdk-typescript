@@ -53,7 +53,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/specstory/specstory-cloud-sdk"
+    "url": "git+https://github.com/specstoryai/specstory-cloud-sdk-typescript.git"
   },
   "devDependencies": {
     "@size-limit/preset-small-lib": "^11.0.0",
